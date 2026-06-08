@@ -84,6 +84,7 @@ func (s *Server) SetupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/main-leaderboard", apiHandler.GetMainLeaderboard)
 
 	// Package challenge API routes
+	mux.HandleFunc("/api/package-leaderboard", apiHandler.GetPackageLeaderboard)
 	mux.HandleFunc("/api/packages/", apiHandler.HandlePackageChallenge)
 	mux.HandleFunc("/api/packages-save-to-filesystem", apiHandler.SavePackageChallengeToFilesystem)
 
@@ -92,6 +93,23 @@ func (s *Server) SetupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/ai/interviewer-questions", apiHandler.AIInterviewerQuestions)
 	mux.HandleFunc("/api/ai/code-hint", apiHandler.AICodeHint)
 	mux.HandleFunc("/api/ai/debug", apiHandler.AIDebugResponse)
+
+	// GitHub webhook route
+	mux.HandleFunc("/webhook/github", apiHandler.GitHubWebhookHandler)
+
+	// Health check endpoint for Railway
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "healthy",
+			"service": "go-interview-practice",
+			"version": "1.0.0",
+		})
+	})
+
+	// Debug route for sponsors
+	mux.HandleFunc("/api/debug/sponsors", apiHandler.GetSponsorsDebug)
 	mux.HandleFunc("/api/ai/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		provider := os.Getenv("AI_PROVIDER")
@@ -142,8 +160,13 @@ func (s *Server) SetupRoutes() *http.ServeMux {
 			// /packages/gin -> package detail page
 			webHandler.PackageDetailPage(w, r)
 		} else if len(parts) == 3 {
-			// /packages/gin/challenge-1 -> package challenge page
-			webHandler.PackageChallengePage(w, r)
+			if parts[2] == "scoreboard" {
+				// /packages/gin/scoreboard -> package leaderboard page
+				webHandler.PackageScoreboardPage(w, r)
+			} else {
+				// /packages/gin/challenge-1 -> package challenge page
+				webHandler.PackageChallengePage(w, r)
+			}
 		} else {
 			http.NotFound(w, r)
 		}
